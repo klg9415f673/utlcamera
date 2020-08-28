@@ -9,6 +9,11 @@ import {DATE} from '.././Date';
 const corsHandler = cors({ origin: true })
 const database = firebaseAdmin.firestore()
 const storage = firebaseAdmin.storage()
+<<<<<<< HEAD
+=======
+const serverCreationTime = fieldValue.serverTimestamp();
+var TODAY = new Date().getTime();
+>>>>>>> fcb99c0... old
 
 export const cameraService = functions.https.onRequest((req: functions.Request, res: functions.Response) => {
     var TODAY = new Date().getTime();
@@ -51,7 +56,11 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
         status:cameraData.substr(26,4) as string,
         data: cameraData.substr(0) as string
     }
+<<<<<<< HEAD
     await database.collection("camera").doc("picture").collection(data.mac).doc(data.SN).collection(time.nowdate).add(data)
+=======
+    await database.collection("camera").doc("picture").collection(data.mac).doc(data.SN).collection(DATE(TODAY).nowdate).add(data)
+>>>>>>> fcb99c0... old
 
     /* 
     如果結束碼 = 順序碼 ，執行composePicture (X)
@@ -84,8 +93,12 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
 async function composePicture(DATA:any, TIME:any) {
 
     console.log("start compose picture")
+<<<<<<< HEAD
     
     var path = `${TIME.nowdate}/${DATA.mac}-${DATA.side}-${DATA.SN}-${TIME.hour}${TIME.min}.jpg`
+=======
+    var path = `${DATE(TODAY).nowdate}/${mac}-${SN}-${DATE(TODAY).hour}${DATE(TODAY).min}.jpg`
+>>>>>>> fcb99c0... old
     var alldata = ""
     var final = ""
     await database.collection("camera").doc("picture").collection(DATA.mac).doc(DATA.SN).collection(TIME.nowdate).orderBy("data").get().then((snapshot) => {
