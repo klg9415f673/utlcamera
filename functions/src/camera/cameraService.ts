@@ -4,18 +4,20 @@ import * as cors from 'cors'
 import { hex2string, stringToHex } from '../transform/transform'
 import { bucket} from '../bucketinformation';
 import { v4 as UUID } from 'uuid';
-import {DATE} from '.././Date';
+const moment = require('moment');
+const tz = require('moment-timezone');
+
 
 const corsHandler = cors({ origin: true })
 const database = firebaseAdmin.firestore()
 const storage = firebaseAdmin.storage()
 
 export const cameraService = functions.https.onRequest((req: functions.Request, res: functions.Response) => {
-    var TODAY = new Date().getTime();
+    var nowdate = new Date().getTime();
     var time = {
-        nowdate: DATE(TODAY).nowdate,
-        hour:DATE(TODAY).hour,
-        min:DATE(TODAY).min
+        nowdate: moment(nowdate).tz("Asia/Taipei").format("YYYYMMDD"),
+        hour:moment(nowdate).tz("Asia/Taipei").format("HH"),
+        min:moment(nowdate).tz("Asia/Taipei").format("mm")
     }
     console.log("cameraService ", req.method)
     corsHandler(req, res, async () => {
@@ -51,22 +53,23 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
         status:cameraData.substr(26,4) as string,
         data: cameraData.substr(0) as string
     }
+    database.collection("camera").doc("picture").set({merge:true})
+    database.collection("camera").doc("picture").collection(data.mac).doc(data.SN).set({merge:true})
     await database.collection("camera").doc("picture").collection(data.mac).doc(data.SN).collection(time.nowdate).add(data)
 
     /* 
     如果結束碼 = 順序碼 ，執行composePicture (X)
     改成找data中含有 ffd9 => JPG檔的結尾 直接使用HTTP上傳為FFD9(大寫)
     */
-    console.log(data.data)
     if (data.data.indexOf("ffd9") != -1) {
         console.log("TCP or UDP server trigger")
         console.log(" find \"ffd9\" ")
-        composePicture(data,time)
+        await composePicture(data,time)
     }
     else if (data.data.indexOf("FFD9") != -1) {
         console.log("HTTP trigger")
         console.log(" find \"FFD9\" ")
-        composePicture(data, time)
+        await composePicture(data, time)
     }
 
     res.status(200).send("OK")

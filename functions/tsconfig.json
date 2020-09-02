@@ -1,14 +1,13 @@
 {
   "compilerOptions": {
+    "lib": ["es6"],
     "module": "commonjs",
     "noImplicitReturns": true,
     // 使弱型別可用
     // "noImplicitAny": false,
-    "noUnusedLocals": true,
     "outDir": "lib",
     "sourceMap": true,
-    "strict": true,
-    "target": "es2017"
+    "target": "es6",
   },
   "compileOnSave": true,
   "include": [

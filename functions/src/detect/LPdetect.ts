@@ -4,15 +4,15 @@ import vision from '@google-cloud/vision';
 const client = new vision.ImageAnnotatorClient();
 import { cardata } from '../modeltype';
 import * as firebaseAdmin from 'firebase-admin';
-import {DATE} from '.././Date';
-
+const moment = require('moment');
+const tz = require('moment-timezone');
 export const LPdetect = functions.storage.bucket(bucket.update_bucket).object().onFinalize(async (image) => {
 
   const fileUrl = image.mediaLink; 
   const fileName = image.name as string; 
   const file_updatedtime = image.timeCreated;
-  const TODAY = new Date().getTime();
-  const [detection] = await client.textDetection(`gs://${bucket.update_bucket}/${DATE(TODAY).nowdate}/${fileName}`);
+  var nowdate = new Date().getTime();
+  const [detection] = await client.textDetection(`gs://${bucket.update_bucket}/${moment(nowdate).tz("Asia/Taipei").format("YYYYMMDD")}/${fileName}`);
 
   console.log("imageobject:",image);
   console.log("detection:",detection);

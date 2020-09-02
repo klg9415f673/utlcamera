@@ -2,7 +2,8 @@ import * as functions from 'firebase-functions'
 import * as firebaseAdmin from 'firebase-admin';
 import * as cors from 'cors'
 import { bucket } from '../bucketinformation';
-import {DATE} from '.././Date';
+const moment = require('moment');
+const tz = require('moment-timezone');
 const corsHandler = cors({ origin: true })
 const storage = firebaseAdmin.storage()       
 
@@ -30,10 +31,10 @@ const weeklydelete = async (req: functions.Request, res: functions.Response) => 
     for (var i=22 ; i<29 ; i++){//清除四周前的資料"夾"
         const changeDate = new Date().getTime() + ( 1000 * 3600 * 24 * -1 * i );
         console.log("Start weekly bucket delete!!!")
-        console.log(`bucket ${DATE(changeDate).nowdate} delete`)
+        console.log(`bucket ${moment(changeDate).tz("Asia/Taipei").format("YYYYMMDD")} delete`)
         const Bucket = storage.bucket(bucket.update_bucket)
         Bucket.deleteFiles({
-            prefix: DATE(changeDate).nowdate
+            prefix: moment(changeDate).tz("Asia/Taipei").format("YYYYMMDD")
         });
     }
 
