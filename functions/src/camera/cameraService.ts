@@ -43,33 +43,36 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
     console.log("req body : ", req.body)
     const cameraData = req.body.cameraData.cameraData
     const data = {
-        rec: cameraData.substr(0, 6) as string,
-        mac: cameraData.substr(6, 4) as string,
+        data:{
+            rec: cameraData.substr(0, 6) as string,
+            mac: cameraData.substr(6, 4) as string,
+            Side:cameraData.substr(10, 2) as string,
+            SN: cameraData.substr(12, 4) as string,
+            Geom:cameraData.substr(20,4) as string,
+            RSSI:cameraData.substr(24,2) as string,
+            status:cameraData.substr(26,4) as string,
+            data: cameraData.substr(0) as string},     
+        status:null,
         side: hex2string(cameraData.substr(10, 2)) as string,
-        Side:cameraData.substr(10, 2) as string,
-        SN: cameraData.substr(12, 4) as string,
-        Geom:cameraData.substr(20,4) as string,
-        RSSI:cameraData.substr(24,2) as string,
-        status:cameraData.substr(26,4) as string,
-        data: cameraData.substr(0) as string
+        timestamp: moment().tz("Asia/Taipei").format("YYYYMMDD")as string
     }
-    database.collection("camera").doc("picture").set({merge:true})
-    database.collection("camera").doc("picture").collection(data.mac).doc(data.SN).set({merge:true})
-    await database.collection("camera").doc("picture").collection(data.mac).doc(data.SN).collection(time.nowdate).add(data)
+    database.collection("camera").doc("picture").set({},{merge:true})
+    database.collection("camera").doc("picture").collection(data.data.mac).doc(data.data.SN).set({},{merge:true})
+    await database.collection("camera").doc("picture").collection(data.data.mac).doc(data.data.SN).collection(time.nowdate).add(data)
 
     /* 
     如果結束碼 = 順序碼 ，執行composePicture (X)
     改成找data中含有 ffd9 => JPG檔的結尾 直接使用HTTP上傳為FFD9(大寫)
     */
-    if (data.data.indexOf("ffd9") != -1) {
+    if (data.data.data.indexOf("ffd9") != -1) {
         console.log("TCP or UDP server trigger")
         console.log(" find \"ffd9\" ")
-        await composePicture(data,time)
+        await composePicture(data.data,time)
     }
-    else if (data.data.indexOf("FFD9") != -1) {
+    else if (data.data.data.indexOf("FFD9") != -1) {
         console.log("HTTP trigger")
         console.log(" find \"FFD9\" ")
-        await composePicture(data, time)
+        await composePicture(data.data, time)
     }
 
     res.status(200).send("OK")
