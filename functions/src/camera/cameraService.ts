@@ -58,7 +58,8 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
     }
     database.collection("camera").doc("picture").set({},{merge:true})
     database.collection("camera").doc("picture").collection(data.data.mac).doc(data.data.SN).set({},{merge:true})
-    await database.collection("camera").doc("picture").collection(data.data.mac).doc(data.data.SN).collection(time.nowdate).add(data)
+    await database.collection("camera").doc("picture").collection(data.data.mac).doc(data.data.SN).collection(time.nowdate + time.hour + time.min)
+    .add(data)
 
     /* 
     如果結束碼 = 順序碼 ，執行composePicture (X)
@@ -67,12 +68,12 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
     if (data.data.data.indexOf("ffd9") != -1) {
         console.log("TCP or UDP server trigger")
         console.log(" find \"ffd9\" ")
-        await composePicture(data.data,time)
+        await composePicture(data,time)
     }
     else if (data.data.data.indexOf("FFD9") != -1) {
         console.log("HTTP trigger")
         console.log(" find \"FFD9\" ")
-        await composePicture(data.data, time)
+        await composePicture(data, time)
     }
 
     res.status(200).send("OK")
@@ -91,18 +92,19 @@ async function composePicture(DATA:any, TIME:any) {
 
     console.log("start compose picture")
     
-    var path = `${TIME.nowdate}/${DATA.mac}-${DATA.side}-${DATA.SN}-${TIME.hour}${TIME.min}.jpg`
+    var path = `${TIME.nowdate}/${DATA.data.mac}-${DATA.side}-${DATA.data.SN}-${TIME.hour}${TIME.min}.jpg`
     var alldata = ""
     var final = ""
-    await database.collection("camera").doc("picture").collection(DATA.mac).doc(DATA.SN).collection(TIME.nowdate).orderBy("data").get().then((snapshot) => {
+    await database.collection("camera").doc("picture").collection(DATA.data.mac).doc(DATA.data.SN).collection(TIME.nowdate + TIME.hour + TIME.min)
+    .get().then((snapshot) => {
         snapshot.forEach((doc) => {
-            var data = doc.data().data.split( DATA.rec + DATA.mac + DATA.Side + DATA.SN);
+            var data = doc.data().data.data.split( DATA.data.rec + DATA.data.mac + DATA.data.Side + DATA.data.SN);
             data.forEach((temp:string) => {
                             if (temp != "") {
                                 alldata = alldata + temp.substr(4); // 8是順序碼的長度
                             }
                         })
-            var Data = alldata.split(DATA.Geom + DATA.RSSI + DATA.status );
+            var Data = alldata.split(DATA.data.Geom + DATA.data.RSSI + DATA.data.status );
             final = Data.join('')
             console.log("final:" + final)
             console.log(doc.id,"=>",doc.data);
@@ -135,6 +137,16 @@ async function composePicture(DATA:any, TIME:any) {
                 }
             }
         )
+        const picturedata = {
+            imgURL:`https://firebasestorage.googleapis.com/v0/b/utl_image_update/o/${TIME.nowdate}%2F${DATA.data.mac}-${DATA.side}-${DATA.data.SN}-${TIME.hour}${TIME.min}.jpg?alt=media&token=${uuid}`,
+            deviceMAC:DATA.data.mac,
+            Side:DATA.side,
+            licenseplate: "",
+            status:"uncheck",
+            timestamp:TIME.nowdate + TIME.hour + TIME.min
+
+        }
+        await database.collection("image").add(picturedata);
     } else {
         console.log("ERROR! : no pictire")
     }

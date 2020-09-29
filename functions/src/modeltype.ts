@@ -1,22 +1,24 @@
 type cardatatype ={
     imageUrl: string;                                       // 從 storage 取得的 url
-    update_time: string;                                    // 上傳時間
-    time: number;                                           //上傳時間timestamp格式
-    ID:string;                                              //資料名稱
+    licenseplate:string;
+    status:boolean;
+    recognizetime:string;
 }
 
 
 
 export class cardata  {
-    imageUrl: string;                                       
-    update_time: string;                                  
-    time: number;
-    ID?:string;
+    imageUrl: string;  
+    licenseplate:string;    
+    status:boolean; 
+    recognizetime:string;                            
+   
 
     constructor(type : cardatatype) {
         this.imageUrl = type.imageUrl;
-        this.update_time = type.update_time;
-        this.time = type.time;
-        this.ID = type.ID;
+        this.licenseplate = type.licenseplate;
+        this.status = type.status;
+        this.recognizetime = type.recognizetime;
+       
     }
 }
