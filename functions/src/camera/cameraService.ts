@@ -92,7 +92,7 @@ async function composePicture(DATA:any, TIME:any) {
 
     console.log("start compose picture")
     
-    var path = `${TIME.nowdate}/${DATA.data.mac}-${DATA.side}-${DATA.data.SN}-${TIME.hour}${TIME.min}.jpg`
+    var path = `${TIME.nowdate}/${DATA.data.mac}/${DATA.side}/${DATA.data.SN}-${TIME.hour}${TIME.min}.jpg`
     var alldata = ""
     var final = ""
     await database.collection("camera").doc("picture").collection(DATA.data.mac).doc(DATA.data.SN).collection(TIME.nowdate + TIME.hour + TIME.min)
@@ -138,7 +138,7 @@ async function composePicture(DATA:any, TIME:any) {
             }
         )
         const picturedata = {
-            imgURL:`https://firebasestorage.googleapis.com/v0/b/utl_image_update/o/${TIME.nowdate}%2F${DATA.data.mac}-${DATA.side}-${DATA.data.SN}-${TIME.hour}${TIME.min}.jpg?alt=media&token=${uuid}`,
+            imgURL:`https://firebasestorage.googleapis.com/v0/b/utl_image_update/o/${TIME.nowdate}%2F${DATA.data.mac}%2F${DATA.side}%2F${DATA.data.SN}-${TIME.hour}${TIME.min}.jpg?alt=media&token=${uuid}`,
             deviceMAC:DATA.data.mac,
             Side:DATA.side,
             licenseplate: "",
