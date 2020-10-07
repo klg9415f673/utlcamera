@@ -1,14 +1,15 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import axios from 'axios';
+import {twilio,LINE,TWSMS} from './imformrConfig';
 const moment = require('moment');
 const tz = require('moment-timezone');
 
 
-export const informSMS = functions.firestore.document('image/{ImgId}').onUpdate(async (change, context) => {
-    const accountSid = 'AC000b39ee881b6a20874d61b54dcaf218'; //accountSid
-    const authToken = 'f9b2e4eeab7eb2d8ed581369e1c19e11'; //authToken
-    const phone = '+15635945444'; //twilio phone
+export const informTwilio = functions.firestore.document('image/{ImgId}').onUpdate(async (change, context) => {
+    const accountSid = twilio.accountSid
+    const authToken = twilio.authToken
+    const phone = twilio.phone
     const client = require('twilio')(accountSid, authToken);
       const timestamp = moment().tz("Asia/Taipei").format("YYYY-MM-DD HH:mm:ss.SSS")
       const person = await admin.firestore().collection("person")
@@ -32,7 +33,7 @@ export const informSMS = functions.firestore.document('image/{ImgId}').onUpdate(
     
 })
 
-export const informSMStw = functions.firestore.document('image/{ImgId}').onUpdate(async (change, context) => {
+export const informTWSMS = functions.firestore.document('image/{ImgId}').onUpdate(async (change, context) => {
     
       const timestamp = moment().tz("Asia/Taipei").format("YYYY-MM-DD HH:mm:ss")
       const person = await admin.firestore().collection("person")
@@ -41,7 +42,7 @@ export const informSMStw = functions.firestore.document('image/{ImgId}').onUpdat
       person.forEach(async doc =>{   
           const mobile = '0'+doc.data().phone.substr(4,9)
           const msg = `${doc.data().name}先生/小姐,您的車輛${doc.data().licenseplate}已在${timestamp}開立停車繳費單`
-          var query = 'username=klg9415f673&password=sg85h136&mobile=' + mobile + '&message=' + msg
+          var query = `username=${TWSMS.account}&password=${TWSMS.passward}&mobile=${mobile}&message=${msg}`
           query = encodeURI(query)
           const url = `http://api.twsms.com/json/sms_send.php?${query}` 
           console.log(url)
@@ -72,12 +73,12 @@ export const informSMStw = functions.firestore.document('image/{ImgId}').onUpdat
 export const informChatBot = functions.firestore.document('image/{ImgId}').onUpdate(async (change, context) => { //僅通報不須webhook
   const linebot = require('linebot');
   const bot = linebot({
-    channelId: '1654966990',
-    channelSecret: 'b445949fea50c8740978b93a1b977f0b',
-    channelAccessToken: 'sf9ZpnPeQ9TsA3wO8tcBasuAo//8v1PYeaplln3D9zyy7Lsmutx/4jIhBJqYucx3UtcscAwba9mZGptIRr1q3IzBRNrRhWA8doxF1cihuuQKhdwZnm7Yoy/Oltap96eFiZwXZR3UfFEZw9yXFzVDYgdB04t89/1O/w1cDnyilFU=    '//CHANNEL_ACCESS_TOKEN
-  });
+    channelId: LINE.channelId,
+    channelSecret: LINE.channelSecret,
+    channelAccessToken: LINE.channelAccessToken
+});
   var previous= change.after.data();
-  const userId = "U8be845f6f29386dc00d0961d733637e6" //LINE上的Your user ID 
+  const userId = LINE.userId 
   const timestamp = moment().tz("Asia/Taipei").format("YYYY-MM-DD HH:mm:ss.SSS")
   const person = await admin.firestore().collection("person")
       .where("licenseplate","==",previous.licenseplate)

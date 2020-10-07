@@ -18,6 +18,6 @@ import * as manager from './bucketmanager/bucketmanager'
 export const bucketmanager = manager.bucketscheduler
 
 import * as userinform from './user/userinform'
-//export const informSMS = userinform.informSMS  //twilio SMS inform user ， 暫不啟用 
+//export const informTwilio = userinform.informTwilio  //twilio SMS inform user ， 暫不啟用 
 export const informChatBot = userinform.informChatBot
-export const informSMStw = userinform.informSMStw  //台灣簡訊
+export const informTWSMS = userinform.informTWSMS  
