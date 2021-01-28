@@ -1,9 +1,11 @@
 import * as functions from 'firebase-functions'
 import * as firebaseAdmin from 'firebase-admin';
 import * as cors from 'cors'
-import { hex2string, stringToHex } from '../transform/transform'
+import { hex2string, stringToHex,hex2int8,hex2uint16,hex2Decimal } from '../transform/transform'
 import { bucket} from '../bucketinformation';
+import { APIKey} from '../Key/APIKey';
 import { v4 as UUID } from 'uuid';
+import axios from 'axios';
 const moment = require('moment');
 const tz = require('moment-timezone');
 
@@ -42,40 +44,130 @@ export const cameraService = functions.https.onRequest((req: functions.Request, 
 const createCamera = async (req: functions.Request, res: functions.Response, time: any) => {
     console.log("req body : ", req.body)
     const cameraData = req.body.cameraData.cameraData
-    const data = {
-        data:{
-            rec: cameraData.substr(0, 6) as string,
-            mac: cameraData.substr(6, 4) as string,
-            Side:cameraData.substr(10, 2) as string,
-            SN: cameraData.substr(12, 4) as string,
-            Geom:cameraData.substr(20,4) as string,
-            RSSI:cameraData.substr(24,2) as string,
-            status:cameraData.substr(26,4) as string,
-            data: cameraData.substr(0) as string},     
-        status:null,
-        side: hex2string(cameraData.substr(10, 2)) as string,
-        timestamp: moment().tz("Asia/Taipei").format("YYYYMMDD")as string
-    }
-    database.collection("camera").doc("picture").set({},{merge:true})
-    database.collection("camera").doc("picture").collection(data.data.mac).doc(data.data.SN).set({},{merge:true})
-    await database.collection("camera").doc("picture").collection(data.data.mac).doc(data.data.SN).collection(time.nowdate + time.hour + time.min)
-    .add(data)
+    var format = cameraData.substr(0, 6)
+    switch(format){
+        case "eeeeee":
+        
+            var uuid = UUID();
+            var resolution = cameraData.split('ffc0')[1]
+            var mac = cameraData.substr(6, 12) as string
+            var side = hex2string(cameraData.substr(18, 2)) as string               
+            var SN = cameraData.substr(20, 4) as string 
+            var Resolution = `${hex2uint16(resolution.substr(10, 4))}x${hex2uint16(resolution.substr(6, 4))}` as string
 
-    /* 
-    如果結束碼 = 順序碼 ，執行composePicture (X)
-    改成找data中含有 ffd9 => JPG檔的結尾 直接使用HTTP上傳為FFD9(大寫)
-    */
-    if (data.data.data.indexOf("ffd9") != -1) {
-        console.log("TCP or UDP server trigger")
-        console.log(" find \"ffd9\" ")
-        await composePicture(data,time)
-    }
-    else if (data.data.data.indexOf("FFD9") != -1) {
-        console.log("HTTP trigger")
-        console.log(" find \"FFD9\" ")
-        await composePicture(data, time)
-    }
+            var data = {
+                data:cameraData.substr(0) as string,  
+                Resolution:Resolution,
+                mac: mac,
+                side: side,                
+                SN: SN,   
+                AMR:hex2uint16(cameraData.substr(28,4)) as string,
+                AMR_F:hex2uint16(cameraData.substr(32,4)) as string,
+                AMR_B:hex2uint16(cameraData.substr(36,4)) as string,
+                RSSI_F:hex2int8(cameraData.substr(40,2)) as string,
+                RSSI_B:hex2int8(cameraData.substr(42,2)) as string,
+                SolarVoltage:cameraData.substr(44,2) as string,
+                Temperature:cameraData.substr(46,2) as string,                
+                status:cameraData.substr(48,4) as string, 
+                imgURL:`https://firebasestorage.googleapis.com/v0/b/utl_image_update/o/${time.nowdate}%2F${mac}%2F${side}%2F${SN}-${time.hour}${time.min}-${Resolution}.jpg?alt=media&token=${uuid}` as string,              
+                timestamp: moment().valueOf() as string,
+                updatetime: moment().tz("Asia/Taipei").format("YYYYMMDDTHH:mm:ss.SSSZ")  as string,
+                
+                
+            }
 
+            var device = {
+                mac:{mac: cameraData.substr(6, 12) as string},
+                AMR:{
+                    AMR:hex2uint16(cameraData.substr(28,4)) as string,
+                    AMR_F:hex2uint16(cameraData.substr(32,4)) as string,
+                    AMR_B:hex2uint16(cameraData.substr(36,4)) as string},
+                RSSI:{
+                    RSSI_F:hex2int8(cameraData.substr(40,2)) as string,
+                    RSSI_B:hex2int8(cameraData.substr(42,2)) as string},
+                Device:{
+                    SolarVoltage:cameraData.substr(44,2) as string,
+                    Temperature:cameraData.substr(46,2) as string},                
+                status:cameraData.substr(48,4) as string,               
+                timestamp: moment().valueOf() as string,
+                updatetime: moment().tz("Asia/Taipei").format("YYYYMMDDTHH:mm:ss.SSSZ")  as string
+            }
+
+
+            database.collection("camera").doc(data.mac)
+            .set(device,{merge:true})
+            database.collection("camera").doc(data.mac).collection(time.nowdate).doc(uuid)
+            .set(data)
+        
+            /* 
+            如果結束碼 = 順序碼 ，執行composePicture (X)
+            改成找data中含有 ffd9 => JPG檔的結尾 直接使用HTTP上傳為FFD9(大寫)
+            */
+            if (data.data.indexOf("ffd9") != -1) {
+                console.log("TCP or UDP server trigger")
+                console.log(" find \"ffd9\" ")
+                await composePicture(data,time,uuid)
+            }
+            else if (data.data.indexOf("FFD9") != -1) {
+                console.log("HTTP trigger")
+                console.log(" find \"FFD9\" ")
+                await composePicture(data, time,uuid)
+            }
+            break;
+        case "ffffff":
+            var Device = {
+                mac:{
+                    mac: cameraData.substr(6, 12) as string,
+                    mac_F: cameraData.substr(18, 12) as string,
+                    mac_B: cameraData.substr(30, 12) as string}, 
+                Device:{
+                    Longitude:cameraData.substr(42,10) as string,
+                    Latitude:cameraData.substr(52,8) as string,
+                    Height:hex2int8(cameraData.substr(60,2)) as string,
+                    Power:cameraData.substr(62,2) as string,
+                    IMEI:cameraData.substr(64,16) as string,
+                    IMSI:cameraData.substr(80,16) as string,                
+                    CSQ:cameraData.substr(96,2) as string},   
+                Version:{
+                    DeviceType:hex2string(cameraData.substr(98,16)) as string,   
+                    HardwareVersion:hex2string(cameraData.substr(114,6)) as string,   
+                    BLEVersion:hex2string(cameraData.substr(120,6)) as string,    
+                    Firmware:hex2string(cameraData.substr(126,8)) as string},                
+                timestamp: moment().valueOf() as string,
+                updatetime: moment().tz("Asia/Taipei").format("YYYY/MM/DDTHH:mm:ss.SSSZ")  as string
+            }
+            var OldData = await database.collection("camera").doc(Device.mac.mac).get()
+            try{
+                if(OldData.exists === false || OldData.data().Device ===undefined || OldData.data().Device.Latitude!==Device.Device.Latitude || OldData.data().Device.Longitude!==Device.Device.Longitude){
+                    var Lat = `${Device.Device.Latitude.substr(0,2)}.${Device.Device.Latitude.substr(2,6)}`;
+                    var Lng = `${Device.Device.Longitude.substr(0,4)}.${Device.Device.Longitude.substr(4,6)}`;
+                    
+                    await axios.get(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${Lat},${Lng}&key=${APIKey.GeocodingAPI}`)
+                        .then(async res=>{
+        
+                            const Site ={ 
+                                Site : {
+                                    District:res.data.results[0].address_components[1].long_name,
+                                    City:res.data.results[0].address_components[2].long_name,
+                                    Country:res.data.results[0].address_components[3].long_name
+                                }
+                            }
+                            await database.collection("camera").doc(Device.mac.mac)
+                            .set(Site,{merge:true})
+                                            
+                        })
+                }
+            }catch(error){
+                console.log(error)
+            }
+            
+
+            await database.collection("camera").doc(Device.mac.mac)
+            .set(Device,{merge:true})
+
+            break;
+    }
+    
     res.status(200).send("OK")
 }
 
@@ -88,34 +180,21 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
 //     res.status(200).send("OK")
 // }
 
-async function composePicture(DATA:any, TIME:any) {
+async function composePicture(DATA:any, TIME:any,UUID:any) {
 
     console.log("start compose picture")
     
-    var path = `${TIME.nowdate}/${DATA.data.mac}/${DATA.side}/${DATA.data.SN}-${TIME.hour}${TIME.min}.jpg`
+    var path = `${TIME.nowdate}/${DATA.mac}/${DATA.side}/${DATA.SN}-${TIME.hour}${TIME.min}-${DATA.Resolution}.jpg`
     var alldata = ""
-    var final = ""
-    await database.collection("camera").doc("picture").collection(DATA.data.mac).doc(DATA.data.SN).collection(TIME.nowdate + TIME.hour + TIME.min)
-    .get().then((snapshot) => {
-        snapshot.forEach((doc) => {
-            var data = doc.data().data.data.split( DATA.data.rec + DATA.data.mac + DATA.data.Side + DATA.data.SN);
-            data.forEach((temp:string) => {
-                            if (temp != "") {
-                                alldata = alldata + temp.substr(4); // 8是順序碼的長度
-                            }
-                        })
-            var Data = alldata.split(DATA.data.Geom + DATA.data.RSSI + DATA.data.status );
-            final = Data.join('')
-            console.log("final:" + final)
-            console.log(doc.id,"=>",doc.data);
-        });
-    }).catch((err) => {
-        console.log("ERROR! : ", err);
-    })
-    var data_buffer = Buffer.from(stringToHex(final));
+    var data = DATA.data.split( DATA.data.substr(0,24));
+    data.forEach((temp:string) => {
+                    if (temp != "") {
+                        alldata = alldata + temp.substr(28); // 4是順序碼的長度
+                    }
+                })
+    var data_buffer = Buffer.from(stringToHex(alldata));
 
     if (data_buffer.length != 0) {
-        let uuid = UUID();
         const file = storage.bucket(bucket.update_bucket).file(path)
         file.save(
             data_buffer,
@@ -124,7 +203,7 @@ async function composePicture(DATA:any, TIME:any) {
                 metadata: {
                     contentType: "image/jpg",
                     metadata: {
-                        firebaseStorageDownloadTokens: uuid
+                        firebaseStorageDownloadTokens: UUID
                       }
                 }
             }, err => {
@@ -138,8 +217,8 @@ async function composePicture(DATA:any, TIME:any) {
             }
         )
         const picturedata = {
-            imgURL:`https://firebasestorage.googleapis.com/v0/b/utl_image_update/o/${TIME.nowdate}%2F${DATA.data.mac}%2F${DATA.side}%2F${DATA.data.SN}-${TIME.hour}${TIME.min}.jpg?alt=media&token=${uuid}`,
-            deviceMAC:DATA.data.mac,
+            imgURL:DATA.imgURL,
+            deviceMAC:DATA.mac,
             Side:DATA.side,
             licenseplate: "",
             status:"uncheck",

@@ -29,6 +29,35 @@ export function hex2int16(hexx:any){  //hex 轉 int16 ,
     return num; 
 }
 
+export function hex2uint16(hexx:any){  //hex 轉 uint16 , 
+    var hex = hexx.toString();
+    var str = '';
+    var num ;
+    for (var i = 0; (i < hex.length); i += 4)
+        str += parseInt(hex.toString().substr(i, 4), 16);
+    
+    num = parseInt(str)
+   
+
+    return num; 
+}
+
+
+export function hex2int8(hexx){  //hex 轉 int8 , 
+    var hex = hexx.toString();
+    var str = '';
+    var num ;
+    for (var i = 0; (i < hex.length); i += 4)
+        str += parseInt(hex.toString().substr(i, 4), 16);
+    
+    num = parseInt(str)
+    if (num>128)
+      num = num - 256
+
+    return num; 
+
+}
+
 export function hex2Decimal4(hexx:any) {  //hex 轉 dec , ex:  1111 =>4369
     var hex = hexx.toString();
     var str = parseInt(hex.toString().substr(0, 4), 16);
