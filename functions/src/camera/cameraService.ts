@@ -1,7 +1,7 @@
 import * as functions from 'firebase-functions'
 import * as firebaseAdmin from 'firebase-admin';
 import * as cors from 'cors'
-import { hex2string, stringToHex,hex2int8,hex2uint16,hex2Decimal } from '../transform/transform'
+import { hex2string, stringToHex,hex2int8,hex2uint16,hex2uint8 } from '../transform/transform'
 import { bucket} from '../bucketinformation';
 import { APIKey} from '../Key/APIKey';
 import { v4 as UUID } from 'uuid';
@@ -54,7 +54,7 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
             var side = hex2string(cameraData.substr(18, 2)) as string               
             var SN = cameraData.substr(20, 4) as string 
             var Resolution = `${hex2uint16(resolution.substr(10, 4))}x${hex2uint16(resolution.substr(6, 4))}` as string
-
+            
             var data = {
                 data:cameraData.substr(0) as string,  
                 Resolution:Resolution,
@@ -66,7 +66,7 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
                 AMR_B:hex2uint16(cameraData.substr(36,4)) as string,
                 RSSI_F:hex2int8(cameraData.substr(40,2)) as string,
                 RSSI_B:hex2int8(cameraData.substr(42,2)) as string,
-                SolarVoltage:cameraData.substr(44,2) as string,
+                SolarVoltage:cameraData.substr(44,2)/10 as Number,
                 Temperature:cameraData.substr(46,2) as string,                
                 status:cameraData.substr(48,4) as string, 
                 imgURL:`https://firebasestorage.googleapis.com/v0/b/utl_image_update/o/${time.nowdate}%2F${mac}%2F${side}%2F${SN}-${time.hour}${time.min}-${Resolution}.jpg?alt=media&token=${uuid}` as string,              
@@ -86,7 +86,7 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
                     RSSI_F:hex2int8(cameraData.substr(40,2)) as string,
                     RSSI_B:hex2int8(cameraData.substr(42,2)) as string},
                 Device:{
-                    SolarVoltage:cameraData.substr(44,2) as string,
+                    SolarVoltage:cameraData.substr(44,2)/10 as Number,
                     Temperature:cameraData.substr(46,2) as string},                
                 status:cameraData.substr(48,4) as string,               
                 timestamp: moment().valueOf() as string,
@@ -124,7 +124,7 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
                     Longitude:cameraData.substr(42,10) as string,
                     Latitude:cameraData.substr(52,8) as string,
                     Height:hex2int8(cameraData.substr(60,2)) as string,
-                    Power:cameraData.substr(62,2) as string,
+                    Power:(2+(hex2uint8(cameraData.substr(62,2))/100)).toFixed(2) as string,
                     IMEI:cameraData.substr(64,16) as string,
                     IMSI:cameraData.substr(80,16) as string,                
                     CSQ:cameraData.substr(96,2) as string},   

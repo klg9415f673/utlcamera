@@ -56,6 +56,21 @@ export function hex2int8(hexx){  //hex 轉 int8 ,
 
     return num; 
 
+
+
+}
+
+export function hex2uint8(hexx){  //hex 轉 uint8 , 
+    var hex = hexx.toString();
+    var str = '';
+    var num ;
+    for (var i = 0; (i < hex.length); i += 4)
+        str += parseInt(hex.toString().substr(i, 4), 16);
+    
+    num = parseInt(str)
+
+    return num; 
+
 }
 
 export function hex2Decimal4(hexx:any) {  //hex 轉 dec , ex:  1111 =>4369
