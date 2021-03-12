@@ -75,6 +75,32 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
                 
                 
             }
+            
+            function status_analysis(raw_data){
+                this.raw_data = raw_data
+                switch(raw_data){
+                    case "0100":
+                        this.status = "初始化";
+                        break;
+                    case "0200":
+                        this.status = "占用";
+                        break;
+                    case "0300":
+                        this.status = "空位";
+                        break;
+                    case "0400":
+                        this.status = "磁場溢出";
+                        break;
+                    case "0500":
+                        this.status = "報平安";
+                        break;
+
+                }
+
+                return this.status;
+
+
+            }
 
             var device = {
                 mac:{mac: cameraData.substr(6, 12) as string},
@@ -88,7 +114,7 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
                 Device:{
                     SolarVoltage:cameraData.substr(44,2)/10 as Number,
                     Temperature:cameraData.substr(46,2) as string},                
-                status:cameraData.substr(48,4) as string,               
+                status:status_analysis(cameraData.substr(48,4)) as string,               
                 timestamp: moment().valueOf() as string,
                 updatetime: moment().tz("Asia/Taipei").format("YYYYMMDDTHH:mm:ss.SSSZ")  as string
             }

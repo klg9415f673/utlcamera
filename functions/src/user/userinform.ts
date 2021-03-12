@@ -137,6 +137,7 @@ export const informChatBot = functions.firestore.document('image/{ImgId}').onUpd
                         previous.status = "inform"
                         previous.timestamp = timestamp
                         await admin.firestore().collection("person").doc(querySnapshot.docs[0].id).collection("parking bill").add(previous)
+                        await admin.firestore().collection("transfer_data").add(previous)
                         await admin.firestore().collection("image").doc(context.params.ImgId).delete();
                         break;
                     case "none":
