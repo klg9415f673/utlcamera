@@ -14,12 +14,37 @@ const corsHandler = cors({ origin: true })
 const database = firebaseAdmin.firestore()
 const storage = firebaseAdmin.storage()
 
+function status_analysis(raw_data){
+    this.raw_data = raw_data
+    switch(raw_data){
+        case "0100":
+            this.status = "初始化";
+            break;
+        case "0200":
+            this.status = "占用";
+            break;
+        case "0300":
+            this.status = "空位";
+            break;
+        case "0400":
+            this.status = "磁場溢出";
+            break;
+        case "0500":
+            this.status = "報平安";
+            break;
+
+    }
+
+    return this.status;
+}
+
 export const cameraService = functions.https.onRequest((req: functions.Request, res: functions.Response) => {
     var nowdate = new Date().getTime();
     var time = {
         nowdate: moment(nowdate).tz("Asia/Taipei").format("YYYYMMDD"),
         hour:moment(nowdate).tz("Asia/Taipei").format("HH"),
-        min:moment(nowdate).tz("Asia/Taipei").format("mm")
+        min:moment(nowdate).tz("Asia/Taipei").format("mm"),
+        timestamp:moment(nowdate).tz("Asia/Taipei").valueOf()
     }
     console.log("cameraService ", req.method)
     corsHandler(req, res, async () => {
@@ -70,36 +95,10 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
                 Temperature:cameraData.substr(46,2) as string,                
                 status:cameraData.substr(48,4) as string, 
                 imgURL:`https://firebasestorage.googleapis.com/v0/b/utl_image_update/o/${time.nowdate}%2F${mac}%2F${side}%2F${SN}-${time.hour}${time.min}-${Resolution}.jpg?alt=media&token=${uuid}` as string,              
-                timestamp: moment().valueOf() as string,
+                timestamp: moment().tz("Asia/Taipei").valueOf() as string,
                 updatetime: moment().tz("Asia/Taipei").format("YYYYMMDDTHH:mm:ss.SSSZ")  as string,
                 
                 
-            }
-            
-            function status_analysis(raw_data){
-                this.raw_data = raw_data
-                switch(raw_data){
-                    case "0100":
-                        this.status = "初始化";
-                        break;
-                    case "0200":
-                        this.status = "占用";
-                        break;
-                    case "0300":
-                        this.status = "空位";
-                        break;
-                    case "0400":
-                        this.status = "磁場溢出";
-                        break;
-                    case "0500":
-                        this.status = "報平安";
-                        break;
-
-                }
-
-                return this.status;
-
-
             }
 
             var device = {
@@ -247,8 +246,10 @@ async function composePicture(DATA:any, TIME:any,UUID:any) {
             deviceMAC:DATA.mac,
             Side:DATA.side,
             licenseplate: "",
+            devicestatus:DATA.status,
             status:"uncheck",
-            timestamp:TIME.nowdate + TIME.hour + TIME.min
+            Time:TIME.nowdate + TIME.hour + TIME.min,
+            Timestamp:TIME.timestamp
 
         }
         await database.collection("image").add(picturedata);

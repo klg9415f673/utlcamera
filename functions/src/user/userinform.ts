@@ -62,9 +62,6 @@ export const informTWSMS = functions.firestore.document('image/{ImgId}').onUpdat
                                         console.log("TW SMS send")
                                         change.after.data().status = "inform"
                                         change.after.data().timestamp = timestamp
-                                        await admin.firestore().collection("person").doc(doc.id).collection("parking bill").add(change.after.data())
-                                        await admin.firestore().collection("image").doc(context.params.ImgId).delete();
-                                    
                                 })
                                 .catch(err=>{
                                     console.log('axios error:',err)
@@ -134,8 +131,8 @@ export const informChatBot = functions.firestore.document('image/{ImgId}').onUpd
                         
                             ]).catch(err=>console.log("linbot push error:",err));
                         console.log("User & Admin inform")
-                        previous.status = "inform"
-                        previous.timestamp = timestamp
+                        previous.status = "inform";
+                        previous.timestamp = timestamp;
                         await admin.firestore().collection("person").doc(querySnapshot.docs[0].id).collection("parking bill").add(previous)
                         await admin.firestore().collection("transfer_data").add(previous)
                         await admin.firestore().collection("image").doc(context.params.ImgId).delete();
