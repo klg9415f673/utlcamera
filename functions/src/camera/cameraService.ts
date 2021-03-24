@@ -75,53 +75,52 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
         
             var uuid = UUID();
             var resolution = cameraData.split('ffc0')[1]
-            var mac = cameraData.substr(6, 12) as string
-            var side = hex2string(cameraData.substr(18, 2)) as string               
-            var SN = cameraData.substr(20, 4) as string 
+            var mac = cameraData.substr(6, 12) as string         
+            var SN = cameraData.substr(18, 4) as string 
             var Resolution = `${hex2uint16(resolution.substr(10, 4))}x${hex2uint16(resolution.substr(6, 4))}` as string
-            
+            var imgURL = `https://firebasestorage.googleapis.com/v0/b/utl_image_update/o/${time.nowdate}%2F${mac}%2F${SN}-${time.hour}${time.min}-${Resolution}.jpg?alt=media&token=${uuid}`
+            var updatetime =  moment().tz("Asia/Taipei").format("YYYYMMDDTHH:mm:ss.SSSZ")
+            var timestamp = moment().valueOf()
             var data = {
-                data:cameraData.substr(0) as string,  
+                data:cameraData.substr(0) as string, 
+                mac:mac, 
+                SN:SN,
                 Resolution:Resolution,
-                mac: mac,
-                side: side,                
-                SN: SN,   
-                AMR:hex2uint16(cameraData.substr(28,4)) as string,
-                AMR_F:hex2uint16(cameraData.substr(32,4)) as string,
-                AMR_B:hex2uint16(cameraData.substr(36,4)) as string,
-                RSSI_F:hex2int8(cameraData.substr(40,2)) as string,
-                RSSI_B:hex2int8(cameraData.substr(42,2)) as string,
-                SolarVoltage:cameraData.substr(44,2)/10 as Number,
-                Temperature:cameraData.substr(46,2) as string,                
-                status:cameraData.substr(48,4) as string, 
-                imgURL:`https://firebasestorage.googleapis.com/v0/b/utl_image_update/o/${time.nowdate}%2F${mac}%2F${side}%2F${SN}-${time.hour}${time.min}-${Resolution}.jpg?alt=media&token=${uuid}` as string,              
-                timestamp: moment().tz("Asia/Taipei").valueOf() as string,
-                updatetime: moment().tz("Asia/Taipei").format("YYYYMMDDTHH:mm:ss.SSSZ")  as string,
+                imgURL: imgURL as string,              
+                timestamp: timestamp as string,
+                updatetime: updatetime  as string,
                 
                 
             }
-
-            var device = {
-                mac:{mac: cameraData.substr(6, 12) as string},
-                AMR:{
-                    AMR:hex2uint16(cameraData.substr(28,4)) as string,
-                    AMR_F:hex2uint16(cameraData.substr(32,4)) as string,
-                    AMR_B:hex2uint16(cameraData.substr(36,4)) as string},
-                RSSI:{
-                    RSSI_F:hex2int8(cameraData.substr(40,2)) as string,
-                    RSSI_B:hex2int8(cameraData.substr(42,2)) as string},
-                Device:{
-                    SolarVoltage:cameraData.substr(44,2)/10 as Number,
-                    Temperature:cameraData.substr(46,2) as string},                
-                status:status_analysis(cameraData.substr(48,4)) as string,               
-                timestamp: moment().valueOf() as string,
-                updatetime: moment().tz("Asia/Taipei").format("YYYYMMDDTHH:mm:ss.SSSZ")  as string
+            var parkinglot = cameraData.substr(26, 4)
+            var Parkinglot_parameter = {
+                Device_paramater:{
+                    Fornt:{
+                        AMR_F:hex2uint16(cameraData.substr(30,4)) as string,
+                        RSSI_F:hex2int8(cameraData.substr(38,2)) as string,
+                        SolarVoltage_F:cameraData.substr(42,2)/10 as Number,
+                        Temperature_F:cameraData.substr(46,2) as Number,
+                    },
+                    Back:{
+                        AMR_B:hex2uint16(cameraData.substr(34,4)) as string,
+                        RSSI_B:hex2int8(cameraData.substr(40,2)) as string,
+                        SolarVoltage_B:cameraData.substr(44,2)/10 as Number,
+                        Temperature_B:cameraData.substr(48,2) as Number,
+                    }
+           
+                 },                
+                parkinglot_status:status_analysis(cameraData.substr(50,2)) as string,               
+                timestamp: timestamp as string,                
+                updatetime: updatetime  as string,
             }
+            Parkinglot_parameter[mac] = imgURL            
+            Parkinglot_parameter[`${mac}_UploadTime`] = timestamp
 
 
-            database.collection("camera").doc(data.mac)
-            .set(device,{merge:true})
-            database.collection("camera").doc(data.mac).collection(time.nowdate).doc(uuid)
+
+            database.collection("parkinglot").doc(parkinglot)
+            .set(Parkinglot_parameter,{merge:true})
+            database.collection("parkinglot").doc(parkinglot).collection(mac).doc(uuid)
             .set(data)
         
             /* 
@@ -209,12 +208,12 @@ async function composePicture(DATA:any, TIME:any,UUID:any) {
 
     console.log("start compose picture")
     
-    var path = `${TIME.nowdate}/${DATA.mac}/${DATA.side}/${DATA.SN}-${TIME.hour}${TIME.min}-${DATA.Resolution}.jpg`
+    var path = `${TIME.nowdate}/${DATA.mac}/${DATA.SN}-${TIME.hour}${TIME.min}-${DATA.Resolution}.jpg`
     var alldata = ""
-    var data = DATA.data.split( DATA.data.substr(0,24));
+    var data = DATA.data.split( DATA.data.substr(0,22));
     data.forEach((temp:string) => {
                     if (temp != "") {
-                        alldata = alldata + temp.substr(28); // 4是順序碼的長度
+                        alldata = alldata + temp.substr(30); 
                     }
                 })
     var data_buffer = Buffer.from(stringToHex(alldata));
@@ -241,18 +240,7 @@ async function composePicture(DATA:any, TIME:any,UUID:any) {
                 }
             }
         )
-        const picturedata = {
-            imgURL:DATA.imgURL,
-            deviceMAC:DATA.mac,
-            Side:DATA.side,
-            licenseplate: "",
-            devicestatus:DATA.status,
-            status:"uncheck",
-            Time:TIME.nowdate + TIME.hour + TIME.min,
-            Timestamp:TIME.timestamp
-
-        }
-        await database.collection("image").add(picturedata);
+     
     } else {
         console.log("ERROR! : no pictire")
     }
