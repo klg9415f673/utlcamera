@@ -6,6 +6,7 @@ import { bucket} from '../bucketinformation';
 import { APIKey} from '../Key/APIKey';
 import { v4 as UUID } from 'uuid';
 import axios from 'axios';
+import { CompositionSettingsList } from 'twilio/lib/rest/video/v1/compositionSettings';
 const moment = require('moment');
 const tz = require('moment-timezone');
 
@@ -14,28 +15,31 @@ const corsHandler = cors({ origin: true })
 const database = firebaseAdmin.firestore()
 const storage = firebaseAdmin.storage()
 
-function status_analysis(raw_data){
-    this.raw_data = raw_data
+async function status_analysis(raw_data:string){
+    let status = "" as string
     switch(raw_data){
-        case "0100":
-            this.status = "初始化";
+        case "00":
+            status = "初始化";
             break;
-        case "0200":
-            this.status = "占用";
+        case "01":
+            status = "占用";
             break;
-        case "0300":
-            this.status = "空位";
+        case "02":
+            status = "空位";
+            break;  
+        case "03":
+            status = "未知";
             break;
-        case "0400":
-            this.status = "磁場溢出";
+        case "04":
+            status = "磁場溢出";
             break;
-        case "0500":
-            this.status = "報平安";
+        case "05":
+            status = "報平安";
             break;
 
     }
 
-    return this.status;
+    return status;
 }
 
 export const cameraService = functions.https.onRequest((req: functions.Request, res: functions.Response) => {
@@ -68,63 +72,88 @@ export const cameraService = functions.https.onRequest((req: functions.Request, 
 
 const createCamera = async (req: functions.Request, res: functions.Response, time: any) => {
     console.log("req body : ", req.body)
-    const cameraData = req.body.cameraData.cameraData
+    const cameraData = req.body.cameraData.cameraData 
     var format = cameraData.substr(0, 6)
     switch(format){
         case "eeeeee":
-        
+            console.log("Picture decoding")
             var uuid = UUID();
             var resolution = cameraData.split('ffc0')[1]
-            var mac = cameraData.substr(6, 12) as string
-            var side = hex2string(cameraData.substr(18, 2)) as string               
-            var SN = cameraData.substr(20, 4) as string 
+            var mac = cameraData.substr(6, 12) as string         
+            var SN = cameraData.substr(18, 4) as string 
             var Resolution = `${hex2uint16(resolution.substr(10, 4))}x${hex2uint16(resolution.substr(6, 4))}` as string
-            
+            var imgURL = `https://firebasestorage.googleapis.com/v0/b/utl_image_update/o/${time.nowdate}%2F${mac}%2F${SN}-${time.hour}${time.min}-${Resolution}.jpg?alt=media&token=${uuid}`
+            var updatetime =  moment().tz("Asia/Taipei").format("YYYYMMDDTHH:mm:ss.SSSZ")
+            var timestamp = moment().valueOf()
             var data = {
-                data:cameraData.substr(0) as string,  
+                data:cameraData.substr(0) as string, 
+                mac:mac, 
+                SN:SN,
                 Resolution:Resolution,
-                mac: mac,
-                side: side,                
-                SN: SN,   
-                AMR:hex2uint16(cameraData.substr(28,4)) as string,
-                AMR_F:hex2uint16(cameraData.substr(32,4)) as string,
-                AMR_B:hex2uint16(cameraData.substr(36,4)) as string,
-                RSSI_F:hex2int8(cameraData.substr(40,2)) as string,
-                RSSI_B:hex2int8(cameraData.substr(42,2)) as string,
-                SolarVoltage:cameraData.substr(44,2)/10 as Number,
-                Temperature:cameraData.substr(46,2) as string,                
-                status:cameraData.substr(48,4) as string, 
-                imgURL:`https://firebasestorage.googleapis.com/v0/b/utl_image_update/o/${time.nowdate}%2F${mac}%2F${side}%2F${SN}-${time.hour}${time.min}-${Resolution}.jpg?alt=media&token=${uuid}` as string,              
-                timestamp: moment().tz("Asia/Taipei").valueOf() as string,
-                updatetime: moment().tz("Asia/Taipei").format("YYYYMMDDTHH:mm:ss.SSSZ")  as string,
-                
-                
+                imgURL: imgURL as string,              
+                timestamp: timestamp as string,
+                updatetime: updatetime  as string,
             }
-            ///var status = await status_analysis(cameraData.substr(48,4))
-            var status =  cameraData.substr(48,4)
-            var device = {
-                mac:{mac: cameraData.substr(6, 12) as string},
-                AMR:{
-                    AMR:hex2uint16(cameraData.substr(28,4)) as string,
-                    AMR_F:hex2uint16(cameraData.substr(32,4)) as string,
-                    AMR_B:hex2uint16(cameraData.substr(36,4)) as string},
-                RSSI:{
-                    RSSI_F:hex2int8(cameraData.substr(40,2)) as string,
-                    RSSI_B:hex2int8(cameraData.substr(42,2)) as string},
-                Device:{
-                    SolarVoltage:cameraData.substr(44,2)/10 as Number,
-                    Temperature:cameraData.substr(46,2) as string},                
-                status:status as string,               
-                timestamp: moment().valueOf() as string,
-                updatetime: moment().tz("Asia/Taipei").format("YYYYMMDDTHH:mm:ss.SSSZ")  as string
+            
+            var parkinglot_status = await status_analysis(cameraData.substr(50,2))
+            var parkinglot = cameraData.substr(26, 4)
+            var Parkinglot_parameter = {
+                Device_paramater:{
+                    Fornt:{
+                        AMR_F:hex2uint16(cameraData.substr(30,4)) as string,
+                        RSSI_F:hex2int8(cameraData.substr(38,2)) as string,
+                        SolarVoltage_F:cameraData.substr(42,2)/10 as Number,
+                        Temperature_F:cameraData.substr(46,2) as Number,
+                    },
+                    Back:{
+                        AMR_B:hex2uint16(cameraData.substr(34,4)) as string,
+                        RSSI_B:hex2int8(cameraData.substr(40,2)) as string,
+                        SolarVoltage_B:cameraData.substr(44,2)/10 as Number,
+                        Temperature_B:cameraData.substr(48,2) as Number,
+                    },
+           
+                },                
+                parkinglot_status:parkinglot_status as string,               
+                timestamp: timestamp as string,                
+                updatetime: updatetime  as string,
             }
 
+           
 
-            database.collection("camera").doc(data.mac)
-            .set(device,{merge:true})
-            database.collection("camera").doc(data.mac).collection(time.nowdate).doc(uuid)
+            await database.collection("parkinglot").doc(parkinglot)
+            .get()
+            .then((doc) => {
+                if (doc.exists) {
+                    console.log("已存在車格資訊")
+                    let mac2 = doc.data().mac.mac2
+                    if(mac2 === null){
+                        let MAC = {
+                            mac1:doc.data().mac.mac1,
+                            mac2:mac
+                        }
+                        database.collection("parkinglot").doc(parkinglot)
+                        .set({"mac":MAC},{merge:true})    
+                    }
+                } else {
+                    console.log("建立新車格資訊")
+                    Parkinglot_parameter["mac"] = {mac1:mac,mac2:null}
+                }
+                               
+            }).catch(function(error) {
+                console.log("Error getting document:", error);
+            })
+
+            Parkinglot_parameter[mac] = imgURL            
+            Parkinglot_parameter[`${mac}_UploadTime`] = timestamp
+            
+            console.log(Parkinglot_parameter)
+
+
+            database.collection("parkinglot").doc(parkinglot)
+            .set(Parkinglot_parameter,{merge:true})
+            database.collection("parkinglot").doc(parkinglot).collection(mac).doc(uuid)
             .set(data)
-        
+
             /* 
             如果結束碼 = 順序碼 ，執行composePicture (X)
             改成找data中含有 ffd9 => JPG檔的結尾 直接使用HTTP上傳為FFD9(大寫)
@@ -141,6 +170,7 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
             }
             break;
         case "ffffff":
+            console.log("Device decoding")
             var Device = {
                 mac:{
                     mac: cameraData.substr(6, 12) as string,
@@ -158,9 +188,11 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
                     DeviceType:hex2string(cameraData.substr(98,16)) as string,   
                     HardwareVersion:hex2string(cameraData.substr(114,6)) as string,   
                     BLEVersion:hex2string(cameraData.substr(120,6)) as string,    
-                    Firmware:hex2string(cameraData.substr(126,8)) as string},                
+                    Firmware:hex2string(cameraData.substr(126,8)) as string},       
+                notification: null ,         
                 timestamp: moment().valueOf() as string,
-                updatetime: moment().tz("Asia/Taipei").format("YYYY/MM/DDTHH:mm:ss.SSSZ")  as string
+                updatetime: moment().tz("Asia/Taipei").format("YYYY/MM/DDTHH:mm:ss.SSSZ")  as string,
+                
             }
             var OldData = await database.collection("camera").doc(Device.mac.mac).get()
             try{
@@ -210,12 +242,12 @@ async function composePicture(DATA:any, TIME:any,UUID:any) {
 
     console.log("start compose picture")
     
-    var path = `${TIME.nowdate}/${DATA.mac}/${DATA.side}/${DATA.SN}-${TIME.hour}${TIME.min}-${DATA.Resolution}.jpg`
+    var path = `${TIME.nowdate}/${DATA.mac}/${DATA.SN}-${TIME.hour}${TIME.min}-${DATA.Resolution}.jpg`
     var alldata = ""
-    var data = DATA.data.split( DATA.data.substr(0,24));
+    var data = DATA.data.split( DATA.data.substr(0,22));
     data.forEach((temp:string) => {
                     if (temp != "") {
-                        alldata = alldata + temp.substr(28); // 4是順序碼的長度
+                        alldata = alldata + temp.substr(30); 
                     }
                 })
     var data_buffer = Buffer.from(stringToHex(alldata));
@@ -242,23 +274,34 @@ async function composePicture(DATA:any, TIME:any,UUID:any) {
                 }
             }
         )
-        const picturedata = {
-            imgURL:DATA.imgURL,
-            deviceMAC:DATA.mac,
-            Side:DATA.side,
-            licenseplate: "",
-            devicestatus:DATA.status,
-            status:"uncheck",
-            Time:TIME.nowdate + TIME.hour + TIME.min,
-            Timestamp:TIME.timestamp
-
-        }
-        await database.collection("image").add(picturedata);
+     
     } else {
         console.log("ERROR! : no pictire")
     }
 
 }
+
+export const UploadTime_Check = functions.firestore.document('parkinglot/{parkinglotId}').onUpdate(async (change, context) => {
+    
+    var newdata = change.after.data()
+    var mac1 = newdata.mac.mac1
+    var mac2 = newdata.mac.mac2
+    var mac1_UploadTime = change.after.data()[`${mac1}_UploadTime`]    
+    var mac2_UploadTime = change.after.data()[`${mac2}_UploadTime`]
+
+    var UploadTime_Check = Math.abs(mac1_UploadTime-mac2_UploadTime)
+    console.log(context.params)
+    console.log(`確認是否建立車格資料，${context.params.notificationI}兩MAC資料上傳相差時間為${UploadTime_Check}`)
+    if(UploadTime_Check <= 60*1000){//1000 = 1s
+        console.log(`${context.params.notificationId}已建立待APP確認之車輛資料`)
+        newdata.notification = "uncheck"
+        newdata.licenseplate = ""
+        await database.collection("notification").add(newdata)
+    }
+            
+
+
+})
 
 
 
