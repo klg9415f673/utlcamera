@@ -30,10 +30,18 @@ export const Linewebhook = linebotwebhook.Linewebhook
 
 
 //------------test-----------------
-import * as camera_test from './camera/cameraService_copy'
-export const cameraService_test = camera_test.cameraService
-export const UploadTime_Check_test = camera_test.UploadTime_Check
+// import * as camera_test from './camera/cameraService_copy'
+// export const cameraService_test = camera_test.cameraService
+// export const UploadTime_Check_test = camera_test.UploadTime_Check
 
-import * as user_test from './user/userinform_copy'
-export const informChatBot_test = user_test.informChatBot
-export const informTWSMS_test = user_test.informTWSMS  
+// import * as user_test from './user/userinform_copy'
+// export const informChatBot_test = user_test.informChatBot
+// export const informTWSMS_test = user_test.informTWSMS  
+
+// import * as camera_test from './camera/cameraService_copy'
+// export const cameraService = camera_test.cameraService
+// export const UploadTime_Check = camera_test.UploadTime_Check
+
+// import * as user_test from './user/userinform_copy'
+// export const informChatBot = user_test.informChatBot
+// export const informTWSMS = user_test.informTWSMS  
