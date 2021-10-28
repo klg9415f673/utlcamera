@@ -242,18 +242,18 @@ async function composePicture(DATA:any, TIME:any,UUID:any) {
                 }
             }
         )
-        const picturedata = {
-            imgURL:DATA.imgURL,
-            deviceMAC:DATA.mac,
-            Side:DATA.side,
-            licenseplate: "",
-            devicestatus:DATA.status,
-            status:"uncheck",
-            Time:TIME.nowdate + TIME.hour + TIME.min,
-            Timestamp:TIME.timestamp
+        // const picturedata = {
+        //     imgURL:DATA.imgURL,
+        //     deviceMAC:DATA.mac,
+        //     Side:DATA.side,
+        //     licenseplate: "",
+        //     devicestatus:DATA.status,
+        //     status:"uncheck",
+        //     Time:TIME.nowdate + TIME.hour + TIME.min,
+        //     Timestamp:TIME.timestamp
 
-        }
-        await database.collection("image").add(picturedata);
+        // }
+        // await database.collection("image").add(picturedata);
     } else {
         console.log("ERROR! : no pictire")
     }

@@ -42,26 +42,23 @@ export const informTwilio = functions.firestore.document('notification/{notifica
 })
 
 export const informTWSMS = functions.firestore.document('notification/{notificationId}').onUpdate(async (change, context) => {
-    
-      const timestamp = moment().tz("Asia/Taipei").format("YYYY-MM-DD HH:mm:ss")
-      const person = await admin.firestore().collection("person")
-          .where("licenseplate","==",change.after.data().licenseplate)
+    var previous= change.after.data();
+    const person = await admin.firestore().collection("person")
+          .where("licenseplate","==",previous.licenseplate)
           .get()
-      person.forEach(async doc =>{   
+    person.forEach(async doc =>{   
             if(doc.data().phone !== undefined ||doc.data().phone != "" ||doc.data().phone !== null){
                     const mobile = '0'+doc.data().phone.substr(4,9)
-                    const msg = `${doc.data().name}先生/小姐,您的車輛${doc.data().licenseplate}已在${timestamp}開立停車繳費單`
+                    const msg = `${doc.data().name}先生/小姐，您停於${previous.parkinglot}的車輛${doc.data().licenseplate}，已在${previous.updatetime}開立停車繳費單`
                     var query = `username=${TWSMS.account}&password=${TWSMS.passward}&mobile=${mobile}&message=${msg}`
                     query = encodeURI(query)
                     const url = `http://api.twsms.com/json/sms_send.php?${query}` 
                     console.log(doc.id, '=>' , doc.data())
-                    switch(change.after.data().status){
+                    switch(previous.notification){
                         case "check":                        
                             axios.get(url)
                                 .then(async res=>{
                                         console.log("TW SMS send")
-                                        change.after.data().status = "inform"
-                                        change.after.data().timestamp = timestamp
                                 })
                                 .catch(err=>{
                                     console.log('axios error:',err)
@@ -86,10 +83,9 @@ export const informChatBot = functions.firestore.document('notification/{notific
       channelId: LINE.channelId,
       channelSecret: LINE.channelSecret,
       channelAccessToken: LINE.channelAccessToken
-  });
+    });
     var previous= change.after.data();
     var userID =[];
-    const timestamp = moment().tz("Asia/Taipei").format("YYYY-MM-DD HH:mm:ss.SSS");
     await admin.firestore().collection("person")
         .where("role","==","admin")
         .get()
@@ -115,9 +111,9 @@ export const informChatBot = functions.firestore.document('notification/{notific
                     userID.push(querySnapshot.docs[i].data().lineID);
                 }
                 console.log(userID);
-                switch(previous.status){
+                switch(previous.notification){
                     case "check":
-                        var msg = `DeviceMAC:${previous.deviceMAC}\r\nSide:${previous.Side}\r\nName:${querySnapshot.docs[0].data().name}\r\nCar:${querySnapshot.docs[0].data().licenseplate}\r\nTime:${timestamp}`
+                        var msg = `ParkingLot:${previous.parkinglot}\r\nName:${querySnapshot.docs[0].data().name}\r\nCar:${querySnapshot.docs[0].data().licenseplate}\r\nTime:${previous.updatetime}`
                         bot.push(userID, [
                             {
                                 type:'text',
@@ -125,16 +121,20 @@ export const informChatBot = functions.firestore.document('notification/{notific
                             },
                             {
                                 type:'image',
-                                originalContentUrl:previous.imgURL,
-                                previewImageUrl:previous.imgURL
+                                originalContentUrl:previous[previous.mac.mac1],
+                                previewImageUrl:previous[previous.mac.mac1]
+                            },
+                            {
+                                type:'image',
+                                originalContentUrl:previous[previous.mac.mac2],
+                                previewImageUrl:previous[previous.mac.mac2]
                             }
                         
                             ]).catch(err=>console.log("linbot push error:",err));
                         console.log("User & Admin inform")
-                        previous.status = "inform";
-                        previous.timestamp = timestamp;
+                        previous.notification = "inform";
                         await admin.firestore().collection("person").doc(querySnapshot.docs[0].id).collection("parking bill").add(previous)
-                        await admin.firestore().collection("transfer_data").add(previous)
+                        await admin.firestore().collection("parkinglot").doc(previous.parkinglot).collection('history').add(previous)
                         await admin.firestore().collection("notification").doc(context.params.notificationId).delete();
                         break;
                     case "none":

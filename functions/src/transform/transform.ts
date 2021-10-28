@@ -56,8 +56,6 @@ export function hex2int8(hexx){  //hex 轉 int8 ,
 
     return num; 
 
-
-
 }
 
 export function hex2uint8(hexx){  //hex 轉 uint8 , 
@@ -90,4 +88,12 @@ export function stringToHex(str:any) {
     }
     // console.log(hex)
     return hex
+}
+
+
+export function paddingLeft(str:any,lenght:any){
+	if(str.length >= lenght)
+	return str;
+	else
+	return paddingLeft("0" +str,lenght);
 }

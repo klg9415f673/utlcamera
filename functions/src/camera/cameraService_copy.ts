@@ -1,7 +1,7 @@
 import * as functions from 'firebase-functions'
 import * as firebaseAdmin from 'firebase-admin';
 import * as cors from 'cors'
-import { hex2string, stringToHex,hex2int8,hex2uint16,hex2uint8 } from '../transform/transform'
+import { hex2string, stringToHex,hex2int8,hex2uint16,hex2uint8,paddingLeft } from '../transform/transform'
 import { bucket} from '../bucketinformation';
 import { APIKey} from '../Key/APIKey';
 import { v4 as UUID } from 'uuid';
@@ -42,6 +42,29 @@ async function status_analysis(raw_data:string){
     return status;
 }
 
+async function PKS7501_status(raw_data:string){
+    var status = "" as string
+    switch(raw_data){
+        case "1":
+            status = "有車";
+            break;
+        case "2":
+            status = "無車";
+            break;
+        case "3":
+            status = "未知";
+            break;
+        case "4":
+            status = "強磁";
+            break;
+        case "5":
+            status = "報平安";
+            break;
+    }
+
+    return status;
+}
+
 export const cameraService = functions.https.onRequest((req: functions.Request, res: functions.Response) => {
     var nowdate = new Date().getTime();
     var time = {
@@ -72,12 +95,15 @@ export const cameraService = functions.https.onRequest((req: functions.Request, 
 
 const createCamera = async (req: functions.Request, res: functions.Response, time: any) => {
     console.log("req body : ", req.body)
-    const cameraData = req.body.cameraData.cameraData 
+    const cameraData = req.body.cameraData.cameraData; 
+    const uuid = req.body.UUID;
     var format = cameraData.substr(0, 6)
+    if (cameraData.substr(0,2) =='40'){//PKS7501
+		format = "@"
+	}
     switch(format){
         case "eeeeee":
             console.log("Picture decoding")
-            var uuid = UUID();
             var resolution = cameraData.split('ffc0')[1]
             var mac = cameraData.substr(6, 12) as string         
             var SN = cameraData.substr(18, 4) as string 
@@ -95,11 +121,11 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
                 updatetime: updatetime  as string,
             }
             
-            var parkinglot_status = await status_analysis(cameraData.substr(50,2))
-            var parkinglot = cameraData.substr(26, 4)
+            var device_status = await status_analysis(cameraData.substr(50,2))
+            var parkinglot = paddingLeft(String(hex2int8(cameraData.substr(26, 4))),4)
             var Parkinglot_parameter = {
                 Device_paramater:{
-                    Fornt:{
+                    Front:{
                         AMR_F:hex2uint16(cameraData.substr(30,4)) as string,
                         RSSI_F:hex2int8(cameraData.substr(38,2)) as string,
                         SolarVoltage_F:cameraData.substr(42,2)/10 as Number,
@@ -111,9 +137,8 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
                         SolarVoltage_B:cameraData.substr(44,2)/10 as Number,
                         Temperature_B:cameraData.substr(48,2) as Number,
                     },
-           
-                },                
-                parkinglot_status:parkinglot_status as string,               
+                }, 
+                id:parkinglot as string,      
                 timestamp: timestamp as string,                
                 updatetime: updatetime  as string,
             }
@@ -125,14 +150,19 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
             .then((doc) => {
                 if (doc.exists) {
                     console.log("已存在車格資訊")
+                    let mac1 = doc.data().mac.mac1
                     let mac2 = doc.data().mac.mac2
-                    if(mac2 === null){
+                    if(mac2 === null && mac1!=mac && mac1!=null){
                         let MAC = {
-                            mac1:doc.data().mac.mac1,
+                            mac1:mac1,
                             mac2:mac
                         }
                         database.collection("parkinglot").doc(parkinglot)
                         .set({"mac":MAC},{merge:true})    
+                    }else if(mac2 === null && mac1==null){
+                        Parkinglot_parameter["mac"] = {mac1:mac,mac2:null};
+                    }else{
+                        
                     }
                 } else {
                     console.log("建立新車格資訊")
@@ -142,17 +172,87 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
             }).catch(function(error) {
                 console.log("Error getting document:", error);
             })
-
-            Parkinglot_parameter[mac] = imgURL            
+            
+            Parkinglot_parameter[`${mac}_status`] = device_status ;   
+            Parkinglot_parameter[mac] = imgURL;        
             Parkinglot_parameter[`${mac}_UploadTime`] = timestamp
             
             console.log(Parkinglot_parameter)
 
 
-            database.collection("parkinglot").doc(parkinglot)
+            await database.collection("parkinglot").doc(parkinglot)
             .set(Parkinglot_parameter,{merge:true})
-            database.collection("parkinglot").doc(parkinglot).collection(mac).doc(uuid)
-            .set(data)
+            await database.collection("parkinglot").doc(parkinglot).collection(mac)
+            .doc("history").collection(time.nowdate).doc(uuid)
+            .set(Parkinglot_parameter)
+            await database.collection("parkinglot").doc(parkinglot).collection(mac)
+            .doc("history").collection(time.nowdate).doc(uuid)
+            .set(data,{merge:true})
+            
+            await database.collection("parkinglot").doc(parkinglot).collection(mac).doc("history")
+            .set({merge:true})
+
+
+            /*垃圾開始 */
+            /*跟垃圾一起的*/
+            // const picturedata = {
+            //     imgURL:data.imgURL,
+            //     deviceMAC:data.mac,
+            //     Side:"",
+            //     licenseplate: "",
+            //     devicestatus:"????",
+            //     status:"uncheck",
+            //     Time:time.nowdate + time.hour + time.min,
+            //     Timestamp:time.timestamp
+
+            // }
+            // /*垃圾結束 */
+            // if(data.mac==="f88a5ef5b8dd" || data.mac==="f88a5ef5baa9" || data.mac==="f88a5ef5b980"){
+            //     if(hex2Decimal4(data.SN) % 2 == 0){
+            //         data["side"] = "B";
+            //         picturedata["Side"] = "B";
+            //     }else{
+            //         data["side"] = "F";
+            //         picturedata["Side"] = "F";
+            //     }
+               
+            //     database.collection("camera").doc(data.mac).collection(time.nowdate).doc(uuid)
+            //         .set(data)
+                    
+            //     await database.collection("image").add(picturedata);
+            // }
+            // if(data.mac==="f88a5ef5ba90" || data.mac==="f88a5ef5ba9a" || data.mac==="f88a5ef5b9ae"){
+            //     if(hex2Decimal4(data.SN) % 2 == 0){
+            //         data["side"] = "B";
+            //         picturedata["Side"] = "B";
+            //     }else{
+            //         data["side"] = "F";
+            //         picturedata["Side"] = "F";
+            //     }
+
+            //     database.collection("camera").doc(data.mac).collection(time.nowdate).doc(uuid)
+            //         .set(data)
+                    
+            //     await database.collection("image").add(picturedata);
+            // }
+     
+
+            //     //03
+            //     "f88a5ef5b8dd"
+            //     "f88a5ef5ba90"
+                 
+            //     //02
+            //     "f88a5ef5baa9"
+            //     case "f88a5ef5ba9a"
+                   
+            //     //27
+            //     "f88a5ef5b980"
+            //     "f88a5ef5b9ae"
+            
+         
+            
+            /*垃圾結束 */
+
 
             /* 
             如果結束碼 = 順序碼 ，執行composePicture (X)
@@ -224,6 +324,63 @@ const createCamera = async (req: functions.Request, res: functions.Response, tim
             .set(Device,{merge:true})
 
             break;
+        case "@":
+            console.log("PKS7501 decoding")
+            var status = await PKS7501_status(cameraData.substr(48, 1))
+            var PKS = {
+                PKS7501_UploadTime:moment().valueOf(),
+                parkinglot_status:status,
+                AMR_sensor:{
+                    Node:{
+                        Mode:cameraData.substr(2,8),
+                        Group:cameraData.substr(10, 2),
+                        TIME_MDH:cameraData.substr(12, 6),
+                        GEO:cameraData.substr(32, 8),
+                        AREA:cameraData.substr(40, 2),
+                        parkinglot_code:cameraData.substr(42, 2),
+                        parkinglot:cameraData.substr(44, 4),
+                        Status:status,
+                        AMR:cameraData.substr(54, 16),
+                        IR_Voltage:cameraData.substr(70, 2),
+                        Solar_Voltage:cameraData.substr(72, 2),
+                        Power:cameraData.substr(74, 2),
+                        Temperature:cameraData.substr(76, 2),
+                        Mac:cameraData.substr(78, 12),
+                       
+                    },
+                    Router:{
+                        TIME_MS:cameraData.substr(18, 4),
+                        GEO:cameraData.substr(22, 10),
+                        Solar_Voltage:cameraData.substr(90, 2),
+                        Power:cameraData.substr(92, 2),
+                        Temperature:cameraData.substr(94, 2),
+                        Mac:cameraData.substr(96, 12),
+                        SN:cameraData.substr(126, 4),
+                        
+                    },
+                    NB_IoT:{
+                        IMSI:cameraData.substr(108, 16),
+                        Signal:cameraData.substr(124, 2),
+                    },                    
+                    
+                }
+                               
+            }
+            await database.collection("lot").doc(PKS.AMR_sensor.Node.parkinglot)
+            .get()
+            .then((doc) => {
+                if (doc.exists===false) {
+                    PKS["mac"] ={
+                        mac1:null,
+                        mac2:null
+                    }
+                }            
+            })
+
+            await database.collection("parkinglot").doc(PKS.AMR_sensor.Node.parkinglot)
+            .set(PKS,{merge:true})
+
+            break;
     }
     
     res.status(200).send("OK")
@@ -274,7 +431,19 @@ async function composePicture(DATA:any, TIME:any,UUID:any) {
                 }
             }
         )
-     
+        const picturedata = {
+            imgURL:DATA.imgURL,
+            deviceMAC:DATA.mac,
+            Side:"side",
+            licenseplate: "",
+            devicestatus:"????",
+            status:"uncheck",
+            Time:TIME.nowdate + TIME.hour + TIME.min,
+            Timestamp:TIME.timestamp
+
+        }
+        await database.collection("image").add(picturedata);
+  
     } else {
         console.log("ERROR! : no pictire")
     }
@@ -286,20 +455,25 @@ export const UploadTime_Check = functions.firestore.document('parkinglot/{parkin
     var newdata = change.after.data()
     var mac1 = newdata.mac.mac1
     var mac2 = newdata.mac.mac2
-    var mac1_UploadTime = change.after.data()[`${mac1}_UploadTime`]    
-    var mac2_UploadTime = change.after.data()[`${mac2}_UploadTime`]
+    var mac1_UploadTime = newdata[`${mac1}_UploadTime`]    
+    var mac2_UploadTime = newdata[`${mac2}_UploadTime`]
+    var PKS7501_UploadTime = newdata.PKS7501_UploadTime
 
     var UploadTime_Check = Math.abs(mac1_UploadTime-mac2_UploadTime)
-    console.log(context.params)
-    console.log(`確認是否建立車格資料，${context.params.notificationI}兩MAC資料上傳相差時間為${UploadTime_Check}`)
-    if(UploadTime_Check <= 60*1000){//1000 = 1s
-        console.log(`${context.params.notificationId}已建立待APP確認之車輛資料`)
+    var parkinglot = context.params.parkinglotId
+
+    console.log(`確認是否建立車格資料，${parkinglot}PKS200E 資料上傳相差時間為${UploadTime_Check}`)
+    if(UploadTime_Check <= 60*1000 ){//1000 = 1s
+      
+        console.log(`${parkinglot}已建立待確認之車輛資料`)
         newdata.notification = "uncheck"
         newdata.licenseplate = ""
+        newdata.parkinglot = parkinglot
+        
         await database.collection("notification").add(newdata)
-    }
-            
 
+       
+    }
 
 })
 
